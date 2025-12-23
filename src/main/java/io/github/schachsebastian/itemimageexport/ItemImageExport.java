@@ -1,5 +1,6 @@
 package io.github.schachsebastian.itemimageexport;
 
+import com.mojang.blaze3d.platform.Lighting;
 import com.mojang.blaze3d.platform.NativeImage;
 import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.Minecraft;
@@ -61,6 +62,7 @@ public class ItemImageExport {
         if (!running) return;
         Minecraft mc = Minecraft.getInstance();
         GuiGraphics graphics = event.getGuiGraphics();
+        Lighting.setupForFlatItems();
         if (!itemIterator.hasNext()) {
             running = false;
             currentItem = null;
