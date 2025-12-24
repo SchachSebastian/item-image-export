@@ -18,6 +18,31 @@ jobs:
         with:
           fetch-depth: 0
 
+      # ---- Extract mod_version from gradle.properties ----
+      - name: Extract version
+        id: version
+        run: |
+          ver=$(grep "^mod_version=" gradle.properties | cut -d'=' -f2)
+          echo "version=$ver" >> "$GITHUB_OUTPUT"
+
+      # ---- Check if tag already exists ----
+      - name: Check if tag exists
+        id: tagcheck
+        run: |
+          tag="v${{ steps.version.outputs.version }}"
+          if git rev-parse "$tag" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # ---- Stop early if version already exists ----
+      - name: Version already released – stopping job
+        if: steps.tagcheck.outputs.exists == 'true'
+        run: |
+          echo "Version v${{ steps.version.outputs.version }} already exists. Skipping build & release."
+          exit 0
+
       - name: Setup JDK 21
         uses: actions/setup-java@v4
         with:
@@ -33,14 +58,7 @@ jobs:
       - name: Build with Gradle
         run: ./gradlew build
 
-      # ---- Extract mod_version from gradle.properties ----
-      - name: Extract version
-        id: version
-        run: |
-          ver=$(grep "^mod_version=" gradle.properties | cut -d'=' -f2)
-          echo "version=$ver" >> "$GITHUB_OUTPUT"
-
-      # ---- Create Git tag for this version ----
+      # ---- Create Git tag ----
       - name: Create Git tag
         env:
           GH_TOKEN: ${{ github.token }}
