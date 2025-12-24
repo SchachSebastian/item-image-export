@@ -1,16 +1,19 @@
-name: Build
+name: Build & Release
 
-on: [push, pull_request]
+on:
+  push:
+    branches:
+      - main
 
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          fetch-tags: true
 
       - name: Setup JDK 21
         uses: actions/setup-java@v4
@@ -21,10 +24,48 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      # This is needed to be able to run ./gradlew below
-      # You can run `git update-index --chmod +x gradlew` then remove this step.
       - name: Make Gradle wrapper executable
         run: chmod +x ./gradlew
 
       - name: Build with Gradle
         run: ./gradlew build
+
+      # ---- Extract mod_version from gradle.properties ----
+      - name: Extract version
+        id: version
+        run: |
+          ver=$(grep "^mod_version=" gradle.properties | cut -d'=' -f2)
+          echo "version=$ver" >> "$GITHUB_OUTPUT"
+
+      # ---- Create Git tag for this version ----
+      - name: Create Git tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="v${{ steps.version.outputs.version }}"
+          git tag "$tag"
+          git push --force --tags
+
+      # ---- Create GitHub Release ----
+      - name: Create Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="v${{ steps.version.outputs.version }}"
+          gh release create --draft "$tag" --title "$tag"
+
+      # ---- Upload built JAR ----
+      - name: Upload JAR
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="v${{ steps.version.outputs.version }}"
+          gh release upload "$tag" build/libs/*.jar
+
+      # ---- Publish release ----
+      - name: Publish Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="v${{ steps.version.outputs.version }}"
+          gh release edit "$tag" --draft=false
